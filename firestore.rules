@@ -1,0 +1,59 @@
+rules_version = '2';
+
+// ============================================================
+// VOCAB QUEST — Firestore Security Rules
+//
+// 核心原則：每個使用者只能讀寫自己 uid 底下的資料。
+// 未登入、或想碰別人 uid 的請求一律拒絕。
+//
+// 這份規則是資料安全的唯一防線（前端的 firebaseConfig 依 Firebase
+// 官方設計本來就是公開的，擋不住任何人），所以請務必部署上去：
+//   Firebase Console → Firestore Database → 規則 → 貼上後「發布」
+// 或用 CLI：firebase deploy --only firestore:rules
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // 單字的基本欄位檢查，避免寫進型別不對的資料
+    function isValidWord() {
+      let d = request.resource.data;
+      return d.original is string
+          && d.original.size() > 0
+          && d.original.size() <= 200
+          && d.translation is string
+          && d.masteryLevel is int
+          && d.masteryLevel >= 0
+          && d.masteryLevel <= 5
+          && d.nextReviewAt is timestamp
+          && d.createdAt is timestamp
+          && d.milestonesDone is map;
+    }
+
+    // 使用者根文件（目前沒實際用到，但一併鎖住）
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // 單字庫：users/{uid}/vocab/{wordId}
+    match /users/{uid}/vocab/{wordId} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isValidWord();
+    }
+
+    // 個人設定（含使用者自己的 Gemini API key）：
+    // users/{uid}/settings/geminiKey
+    match /users/{uid}/settings/{settingId} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // 以上沒有明確允許的路徑，一律拒絕
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

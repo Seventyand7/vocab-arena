@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VOCAB QUEST · 單字練習</title>
+<meta name="description" content="個人用英文單字學習工具：自動翻譯、單字卡複習、翻牌配對測驗。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="bg-grid" aria-hidden="true"></div>
+<div class="bg-glow" aria-hidden="true"></div>
+
+<!-- ============ 開機 / 載入 ============ -->
+<div id="boot-screen" class="screen is-active">
+  <div class="boot-box">
+    <div class="logo-mark logo-lg">VQ</div>
+    <p class="pixel boot-text">LOADING<span class="dots"></span></p>
+  </div>
+</div>
+
+<!-- ============ Firebase 設定引導（僅在 config 未填時出現） ============ -->
+<div id="setup-screen" class="screen">
+  <div class="panel panel-wide">
+    <h1 class="pixel title-md accent-gold">SETUP</h1>
+    <p class="lead">尚未偵測到 Firebase 專案設定。請到 Firebase Console →「專案設定 → 你的應用程式」複製 <code>firebaseConfig</code> 物件，貼在下面。</p>
+    <p class="hint">這段 config <b>不是機密</b>（Firebase 官方設計如此，資料安全靠 Security Rules）。正式使用時請直接把它填進 <code>js/config.js</code> 並提交進 git；這裡貼上只會暫存在本機瀏覽器，方便先試跑。</p>
+    <textarea id="setup-config" class="input mono" rows="10" spellcheck="false"></textarea>
+    <div id="setup-error" class="alert alert-error" hidden></div>
+    <button id="setup-save" class="btn btn-primary btn-block">儲存並啟動</button>
+  </div>
+</div>
+
+<!-- ============ 登入 ============ -->
+<div id="login-screen" class="screen">
+  <div class="panel panel-narrow text-center">
+    <div class="logo-mark logo-lg">VQ</div>
+    <h1 class="pixel title-lg">VOCAB<br><span class="accent-pink">QUEST</span></h1>
+    <p class="lead">個人單字修煉場。登入後才能存取你的單字庫。</p>
+    <button id="google-signin" class="btn btn-google btn-block">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.4a5.5 5.5 0 0 1-2.4 3.6v3h3.9c2.3-2.1 3.6-5.2 3.6-8.8z"/><path fill="#34A853" d="M12 24c3.2 0 5.9-1.1 7.9-2.9l-3.9-3c-1.1.7-2.4 1.2-4 1.2-3.1 0-5.7-2.1-6.6-4.9H1.4v3.1A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.4 14.4a7.2 7.2 0 0 1 0-4.6V6.7H1.4a12 12 0 0 0 0 10.8l4-3.1z"/><path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4C17.9 1.2 15.2 0 12 0 7.4 0 3.4 2.6 1.4 6.7l4 3.1C6.3 6.9 8.9 4.8 12 4.8z"/></svg>
+      <span>使用 Google 帳號登入</span>
+    </button>
+    <div id="login-error" class="alert alert-error" hidden></div>
+    <p class="hint mt-lg">翻譯功能需要你自己的 Gemini API key，登入後在「設定」頁輸入即可。金鑰只存在你自己的 Firestore 文件中，不會寫進程式碼。</p>
+  </div>
+</div>
+
+<!-- ============ 主程式 ============ -->
+<div id="app-screen" class="screen">
+  <header class="topbar">
+    <div class="brand"><span class="logo-mark logo-sm">VQ</span><span class="pixel brand-text">VOCAB QUEST</span></div>
+    <div class="topbar-right">
+      <div class="stat-chip" title="單字總數"><span class="stat-label">WORDS</span><span id="stat-total" class="pixel stat-num">0</span></div>
+      <div class="stat-chip" title="目前待複習"><span class="stat-label">DUE</span><span id="stat-due" class="pixel stat-num accent-gold">0</span></div>
+      <img id="user-avatar" class="user-avatar" alt="" width="30" height="30">
+    </div>
+  </header>
+
+  <nav class="tabbar" role="tablist">
+    <button class="tab is-active" role="tab" data-view="add"><span class="tab-ico">✎</span><span>新增單字</span></button>
+    <button class="tab" role="tab" data-view="cards"><span class="tab-ico">▤</span><span>單字卡</span></button>
+    <button class="tab" role="tab" data-view="match"><span class="tab-ico">⚌</span><span>翻牌配對</span></button>
+    <button class="tab" role="tab" data-view="list"><span class="tab-ico">☰</span><span>單字庫</span></button>
+    <button class="tab" role="tab" data-view="settings"><span class="tab-ico">⚙</span><span>設定</span></button>
+  </nav>
+
+  <main class="stage">
+
+    <!-- ---------- 介面 1：新增單字 ---------- -->
+    <section class="view is-active" data-view="add">
+      <div class="panel">
+        <h2 class="pixel title-sm accent-cyan">NEW WORD</h2>
+        <p class="lead">輸入英文單字或片語，交給 Gemini 產生翻譯、詞性與例句。</p>
+        <form id="translate-form" class="row-form" autocomplete="off">
+          <input id="word-input" class="input input-lg" type="text" placeholder="resilient / break the ice" maxlength="120" required>
+          <button id="translate-btn" class="btn btn-primary" type="submit">翻譯</button>
+        </form>
+        <div id="add-error" class="alert alert-error" hidden></div>
+        <div id="translate-loading" class="loading-row" hidden>
+          <span class="spinner"></span><span class="pixel">TRANSLATING<span class="dots"></span></span>
+        </div>
+      </div>
+
+      <div id="preview-panel" class="panel preview-panel" hidden>
+        <div class="preview-head">
+          <h3 id="pv-original" class="preview-word"></h3>
+          <span id="pv-pos" class="badge badge-pos"></span>
+        </div>
+        <div class="preview-body">
+          <div class="field"><span class="field-label">中文翻譯</span><p id="pv-translation" class="field-value field-value-strong"></p></div>
+          <div class="field"><span class="field-label">例句</span><p id="pv-example" class="field-value field-en"></p><p id="pv-example-zh" class="field-value field-sub"></p></div>
+        </div>
+        <div class="preview-actions">
+          <button id="confirm-add" class="btn btn-primary">確認加入單字庫</button>
+          <button id="retry-translate" class="btn btn-ghost">重新翻譯</button>
+          <button id="discard-preview" class="btn btn-ghost">捨棄</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- 介面 2：單字卡 ---------- -->
+    <section class="view" data-view="cards">
+      <div id="cards-empty" class="panel text-center" hidden>
+        <h2 class="pixel title-sm accent-gold">NO CARDS</h2>
+        <p id="cards-empty-msg" class="lead"></p>
+        <button class="btn btn-primary goto-add">去新增單字</button>
+      </div>
+
+      <div id="cards-stage" hidden>
+        <div class="session-bar">
+          <span class="pixel session-count"><span id="card-idx">1</span>/<span id="card-total">1</span></span>
+          <div class="progress"><div id="card-progress" class="progress-fill"></div></div>
+          <button id="cards-restart" class="btn btn-mini btn-ghost">重新開始</button>
+        </div>
+
+        <div class="flashcard-wrap">
+          <div id="flashcard" class="flashcard" tabindex="0" role="button" aria-label="點擊翻面">
+            <div class="flashcard-inner">
+              <div class="flashcard-face flashcard-front">
+                <span id="fc-badge-forced" class="badge badge-forced" hidden>里程碑複習</span>
+                <p id="fc-front-word" class="fc-word"></p>
+                <span class="fc-hint pixel">TAP TO FLIP</span>
+              </div>
+              <div class="flashcard-face flashcard-back">
+                <span id="fc-pos" class="badge badge-pos"></span>
+                <p id="fc-translation" class="fc-translation"></p>
+                <p id="fc-example" class="fc-example"></p>
+                <p id="fc-example-zh" class="fc-example-zh"></p>
+                <div class="mastery"><span class="mastery-label pixel">LV</span><div id="fc-mastery" class="pips"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="grade-row" class="grade-row" hidden>
+          <button id="grade-forgot" class="btn btn-danger">不熟</button>
+          <button id="grade-known" class="btn btn-success">記得</button>
+        </div>
+        <p id="grade-hint" class="hint text-center">先翻面看答案，再評分</p>
+      </div>
+
+      <div id="cards-done" class="panel text-center" hidden>
+        <h2 class="pixel title-md accent-cyan">CLEAR!</h2>
+        <p class="lead">這輪複習完成。</p>
+        <div class="result-stats">
+          <div class="result-stat"><span class="pixel result-num accent-cyan" id="res-known">0</span><span class="result-label">記得</span></div>
+          <div class="result-stat"><span class="pixel result-num accent-pink" id="res-forgot">0</span><span class="result-label">不熟</span></div>
+        </div>
+        <button id="cards-again" class="btn btn-primary">再來一輪</button>
+      </div>
+    </section>
+
+    <!-- ---------- 介面 3：翻牌配對 ---------- -->
+    <section class="view" data-view="match">
+      <div id="match-empty" class="panel text-center" hidden>
+        <h2 class="pixel title-sm accent-gold">NOT ENOUGH</h2>
+        <p id="match-empty-msg" class="lead"></p>
+        <button class="btn btn-primary goto-add">去新增單字</button>
+      </div>
+
+      <div id="match-stage" hidden>
+        <div class="session-bar">
+          <span class="pixel session-count">PAIRS <span id="match-found">0</span>/<span id="match-pairs">6</span></span>
+          <div class="progress"><div id="match-progress" class="progress-fill"></div></div>
+          <button id="match-restart" class="btn btn-mini btn-ghost">重新洗牌</button>
+        </div>
+        <div id="match-notice" class="notice" hidden></div>
+        <div id="match-board" class="match-board"></div>
+      </div>
+
+      <div id="match-done" class="panel text-center" hidden>
+        <h2 class="pixel title-md accent-cyan">ALL MATCHED!</h2>
+        <p class="lead">這輪全部配對完成。</p>
+        <button id="match-again" class="btn btn-primary">再來一輪</button>
+      </div>
+    </section>
+
+    <!-- ---------- 單字庫 ---------- -->
+    <section class="view" data-view="list">
+      <div class="panel">
+        <div class="list-head">
+          <h2 class="pixel title-sm accent-cyan">LIBRARY</h2>
+          <input id="list-search" class="input input-search" type="search" placeholder="搜尋單字 / 翻譯">
+        </div>
+        <div id="list-body" class="word-list"></div>
+      </div>
+    </section>
+
+    <!-- ---------- 設定 ---------- -->
+    <section class="view" data-view="settings">
+      <div class="panel">
+        <h2 class="pixel title-sm accent-gold">GEMINI API KEY</h2>
+        <p class="lead">翻譯功能需要你自己的 Gemini API key。到 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a> 建立一組後貼在下面。</p>
+        <p class="hint">金鑰會存進你自己的 Firestore 文件 <code>users/&lt;你的 uid&gt;/settings/geminiKey</code>，受 Security Rules 保護，只有你自己讀得到，<b>不會寫進程式碼也不會進 git</b>。</p>
+        <div class="row-form">
+          <input id="api-key-input" class="input mono" type="password" placeholder="AIza..." autocomplete="off" spellcheck="false">
+          <button id="api-key-toggle" class="btn btn-ghost btn-icon" type="button" title="顯示或隱藏金鑰">顯示</button>
+        </div>
+        <div class="field mt-md">
+          <span class="field-label">模型</span>
+          <select id="model-select" class="input">
+            <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite（最便宜，預設）</option>
+            <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</option>
+            <option value="gemini-2.5-flash">gemini-2.5-flash（品質稍高）</option>
+          </select>
+        </div>
+        <div id="settings-msg" class="alert" hidden></div>
+        <div class="btn-row mt-md">
+          <button id="api-key-save" class="btn btn-primary">儲存金鑰</button>
+          <button id="api-key-test" class="btn btn-ghost">測試連線</button>
+          <button id="api-key-clear" class="btn btn-ghost btn-danger-ghost">清除金鑰</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2 class="pixel title-sm accent-cyan">ACCOUNT</h2>
+        <div class="account-row">
+          <img id="settings-avatar" class="user-avatar user-avatar-lg" alt="" width="44" height="44">
+          <div class="account-meta"><span id="settings-name" class="account-name"></span><span id="settings-email" class="account-email"></span></div>
+        </div>
+        <button id="signout-btn" class="btn btn-ghost mt-md">登出</button>
+      </div>
+
+      <div class="panel">
+        <h2 class="pixel title-sm">排程規則</h2>
+        <ul class="rules">
+          <li>建立後第 <b>1 / 3 / 7 天</b>必定各出現一次（不論熟悉度）。</li>
+          <li>熟悉度 0–5 對應複習間隔 <b>1 / 2 / 4 / 7 / 14 / 30 天</b>。</li>
+          <li>單字卡「記得」＋1、「不熟」歸零；配對成功＋1、配對失敗兩張各 −2。</li>
+          <li>候選不足時，以熟悉度越低權重越高的加權隨機補足。</li>
+        </ul>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div id="toast-host" class="toast-host" aria-live="polite"></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

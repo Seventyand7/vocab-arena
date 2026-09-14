@@ -1,0 +1,24 @@
+# 本地測試用的環境變數 / 憑證檔案，絕對不要提交
+.env
+.env.*
+*.local
+secrets.json
+serviceAccount*.json
+*-service-account.json
+google-services.json
+credentials.json
+firebase-debug.log
+.firebase/
+.firebaserc
+
+# 依賴與建置產物
+node_modules/
+dist/
+build/
+
+# 編輯器 / 系統
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
