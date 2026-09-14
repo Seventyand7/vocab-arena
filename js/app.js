@@ -135,6 +135,12 @@ async function onAuthChange(user) {
     }
   } catch (err) {
     console.error(err);
+    // Security Rules 鎖定擁有者本人時，其他人登入會拿到 permission-denied
+    if (err?.code === "permission-denied") {
+      await signOutUser();
+      showAlert($("#login-error"), "這是個人使用的工具，只有擁有者本人的帳號能存取資料。");
+      return;
+    }
     toast(`讀取資料失敗：${err.message}`, true);
   }
 }
@@ -147,6 +153,7 @@ function renderAccount(user) {
   }
   setText($("#settings-name"), user.displayName || "（未設定名稱）");
   setText($("#settings-email"), user.email || "");
+  $("#uid-display").value = user.uid;
 }
 
 /* ============================================================
@@ -169,6 +176,19 @@ function wireStaticHandlers() {
   });
 
   $("#signout-btn").addEventListener("click", () => signOutUser());
+
+  $("#uid-copy").addEventListener("click", async () => {
+    const uid = $("#uid-display").value;
+    if (!uid) return;
+    try {
+      await navigator.clipboard.writeText(uid);
+      toast("UID 已複製");
+    } catch (_) {
+      // 沒有剪貼簿權限（例如非 https）時，退而求其次選起來讓使用者手動複製
+      $("#uid-display").select();
+      toast("請按 Ctrl+C 複製");
+    }
+  });
 
   $$(".tab").forEach((tab) => {
     tab.addEventListener("click", () => switchView(tab.dataset.view));

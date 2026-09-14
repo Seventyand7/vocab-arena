@@ -6,6 +6,10 @@ rules_version = '2';
 // 核心原則：每個使用者只能讀寫自己 uid 底下的資料。
 // 未登入、或想碰別人 uid 的請求一律拒絕。
 //
+// 另外因為網站是公開的，這裡再加一層鎖：只有 ownerUid() 這個帳號
+// 能存取任何資料。其他人就算用自己的 Google 帳號登入，也讀寫不了
+// 任何東西（前端會顯示「只有擁有者本人能存取」並自動登出）。
+//
 // 這份規則是資料安全的唯一防線（前端的 firebaseConfig 依 Firebase
 // 官方設計本來就是公開的，擋不住任何人），所以請務必部署上去：
 //   Firebase Console → Firestore Database → 規則 → 貼上後「發布」
@@ -15,8 +19,19 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ⚠️ 把這裡換成你自己的 Firebase UID（登入後在「設定 → ACCOUNT」可以複製）。
+    //    換好之前先不要發布這份規則，否則你自己也會被鎖在外面。
+    function ownerUid() {
+      return 'REPLACE_WITH_YOUR_UID';
+    }
+
+    // 必須同時滿足：已登入、資料屬於自己、而且就是這個網站的擁有者本人。
+    // 第三個條件讓這個公開網址只有你能用 —— 別人就算用自己的 Google
+    // 帳號登入，也無法在你的 Firebase 專案裡建立任何資料。
     function isOwner(uid) {
-      return request.auth != null && request.auth.uid == uid;
+      return request.auth != null
+          && request.auth.uid == uid
+          && request.auth.uid == ownerUid();
     }
 
     // 單字的基本欄位檢查，避免寫進型別不對的資料
