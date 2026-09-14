@@ -130,7 +130,7 @@ users/{uid}/settings/geminiKey
 純前端，沒有建置流程 —— HTML / CSS / 原生 ES modules 直接跑。
 
 - Firebase Authentication（Google 登入）＋ Firestore，透過 CDN 載入 modular SDK
-- Gemini API：預設 `gemini-2.5-flash-lite`（翻譯單字這種輕量任務用最便宜的等級就夠，設定頁可切換）
+- Gemini API：預設用最便宜的 Flash-Lite 等級模型（翻譯單字這種輕量任務夠用）。設定頁的「偵測可用模型」會直接跟 API 要你的金鑰實際能用的清單，所以模型改版退役也不會卡住
 - 字體：Press Start 2P（數字與標題）＋ Noto Sans TC（內文）
 
 ## 檔案

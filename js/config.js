@@ -30,12 +30,24 @@ export function isConfigPlaceholder(cfg) {
 /* ---------------- Gemini ---------------- */
 
 /** 翻譯是輕量任務，預設用最便宜的 Flash-Lite 等級模型。 */
-export const DEFAULT_MODEL = "gemini-2.5-flash-lite";
-export const ALLOWED_MODELS = [
+export const DEFAULT_MODEL = "gemini-3.5-flash-lite";
+
+/**
+ * 設定頁下拉選單的初始選項。
+ * 模型會改版，所以這只是還沒偵測前的墊檔 —— 實際清單由
+ * listModels() 直接跟 API 要，以你的 key 真正能用的為準。
+ */
+export const FALLBACK_MODELS = [
+  "gemini-3.5-flash-lite",
+  "gemini-3.1-flash-lite",
   "gemini-2.5-flash-lite",
-  "gemini-2.0-flash-lite",
+  "gemini-3.5-flash",
   "gemini-2.5-flash",
 ];
+
+/** 模型名稱的基本格式檢查（避免存進奇怪的字串）。 */
+export const isValidModelName = (m) =>
+  typeof m === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$/.test(m);
 
 /* ---------------- 排程參數 ---------------- */
 

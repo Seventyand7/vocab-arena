@@ -8,7 +8,7 @@ import {
   getDb, collection, doc, getDoc, getDocs, setDoc, addDoc,
   deleteDoc, writeBatch, Timestamp,
 } from "./firebase.js";
-import { DEFAULT_MODEL, ALLOWED_MODELS } from "./config.js";
+import { DEFAULT_MODEL, isValidModelName } from "./config.js";
 
 let uid = null;
 /** 本機快取：整個單字庫。個人用量級（幾百到幾千字）一次載入最單純。 */
@@ -128,7 +128,7 @@ export async function saveProgress(updates) {
 export async function loadSettings() {
   const snap = await getDoc(settingsDoc("geminiKey"));
   const data = snap.exists() ? snap.data() : {};
-  const model = ALLOWED_MODELS.includes(data.model) ? data.model : DEFAULT_MODEL;
+  const model = isValidModelName(data.model) ? data.model : DEFAULT_MODEL;
   return { apiKey: data.apiKey || "", model };
 }
 
@@ -137,7 +137,7 @@ export async function saveSettings({ apiKey, model }) {
     settingsDoc("geminiKey"),
     {
       apiKey: apiKey || "",
-      model: ALLOWED_MODELS.includes(model) ? model : DEFAULT_MODEL,
+      model: isValidModelName(model) ? model : DEFAULT_MODEL,
       updatedAt: Timestamp.fromDate(new Date()),
     },
     { merge: true }

@@ -49,7 +49,7 @@ function friendlyError(status, message) {
     return "超過使用額度或請求太頻繁（429），請稍後再試。";
   }
   if (status === 404) {
-    return "找不到這個模型（404）。請到設定頁換一個模型再試。";
+    return "找不到這個模型（404），可能是名稱已經改版或退役。請到設定頁按「偵測可用模型」重新抓一次清單。";
   }
   return message || `Gemini API 錯誤（HTTP ${status}）`;
 }
@@ -100,8 +100,9 @@ export async function translateWord(input, apiKey, model) {
     },
   };
 
-  // 2.5 系列預設會思考，翻譯單字用不到，關掉可以省 token。
-  const body = model.startsWith("gemini-2.5")
+  // 2.5 以後的系列預設會思考，翻譯單字用不到，關掉可以省 token。
+  // 萬一某個模型不吃這個參數，下面會自動拿掉重試一次。
+  const body = /^gemini-(2\.5|[3-9])/.test(model)
     ? { ...baseBody, generationConfig: { ...baseBody.generationConfig, thinkingConfig: { thinkingBudget: 0 } } }
     : baseBody;
 
@@ -110,7 +111,7 @@ export async function translateWord(input, apiKey, model) {
     data = await callGemini(model, apiKey, body);
   } catch (err) {
     // 某些模型版本不吃 thinkingConfig，拿掉重試一次。
-    if (err.status === 400 && body !== baseBody && /thinking/i.test(err.raw || "")) {
+    if (err.status === 400 && body !== baseBody) {
       data = await callGemini(model, apiKey, baseBody);
     } else {
       throw err;
@@ -150,6 +151,55 @@ export async function translateWord(input, apiKey, model) {
   }
 
   return result;
+}
+
+/**
+ * 問 API 這把 key 實際能用哪些模型（ListModels）。
+ * 模型會改版、退役，寫死清單早晚會 404，所以一律以這裡回傳的為準。
+ * @returns {Promise<string[]>} 支援 generateContent 的模型名稱，便宜的排前面
+ */
+export async function listModels(apiKey) {
+  if (!apiKey) throw new Error("尚未設定 Gemini API key，請先在上面貼上金鑰。");
+
+  const names = [];
+  let pageToken = "";
+
+  // 清單有分頁，全部抓完
+  do {
+    const url = new URL(`${ENDPOINT}`);
+    url.searchParams.set("key", apiKey);
+    url.searchParams.set("pageSize", "200");
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      let message = "";
+      try {
+        message = (await res.json())?.error?.message || "";
+      } catch (_) {
+        message = "";
+      }
+      throw new Error(friendlyError(res.status, message));
+    }
+
+    const data = await res.json();
+    for (const m of data.models || []) {
+      if (!m.supportedGenerationMethods?.includes("generateContent")) continue;
+      const id = String(m.name || "").replace(/^models\//, "");
+      if (id.startsWith("gemini-")) names.push(id);
+    }
+    pageToken = data.nextPageToken || "";
+  } while (pageToken);
+
+  // 便宜的排前面：flash-lite → flash → 其他，同組內版本新的優先
+  const tier = (id) => (id.includes("flash-lite") ? 0 : id.includes("flash") ? 1 : 2);
+  const version = (id) => parseFloat(id.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] || "0");
+
+  return [...new Set(names)].sort((a, b) => {
+    if (tier(a) !== tier(b)) return tier(a) - tier(b);
+    if (version(a) !== version(b)) return version(b) - version(a);
+    return a.localeCompare(b);
+  });
 }
 
 /** 設定頁的「測試連線」：用最小的請求確認金鑰可用。 */

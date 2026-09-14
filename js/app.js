@@ -10,9 +10,9 @@ import {
   setUid, loadWords, getWords, addWord, deleteWord,
   loadSettings, saveSettings,
 } from "./store.js";
-import { translateWord, testApiKey } from "./gemini.js";
+import { translateWord, testApiKey, listModels } from "./gemini.js";
 import { countDue } from "./scheduler.js";
-import { DEFAULT_MODEL } from "./config.js";
+import { DEFAULT_MODEL, FALLBACK_MODELS } from "./config.js";
 import { $, $$, show, setText, showScreen, toast, showAlert, relativeDay } from "./ui.js";
 import { initFlashcards, startSession } from "./flashcards.js";
 import { initMatch, startRound } from "./match.js";
@@ -127,11 +127,15 @@ async function onAuthChange(user) {
     session.apiKey = settings.apiKey;
     session.model = settings.model;
     $("#api-key-input").value = settings.apiKey;
-    $("#model-select").value = settings.model;
+    fillModelOptions(FALLBACK_MODELS, settings.model);
     refreshStats();
     renderWordList();
     if (!settings.apiKey) {
       toast("還沒設定 Gemini API key，翻譯功能會無法使用。");
+    } else {
+      // 有金鑰就順手抓一次真正可用的模型清單（ListModels 不花 token），
+      // 免得寫死的預設值早就退役了還在用。
+      detectModels({ silent: true });
     }
   } catch (err) {
     console.error(err);
@@ -298,8 +302,71 @@ async function confirmAdd() {
    設定
    ============================================================ */
 
+/** 把模型清單填進下拉選單，盡量保留目前選中的那個。 */
+function fillModelOptions(models, selected) {
+  const sel = $("#model-select");
+  const list = [...new Set([...models, selected].filter(Boolean))];
+  sel.innerHTML = "";
+  for (const id of list) {
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = id + (id === list[0] ? "（最便宜）" : "");
+    sel.appendChild(opt);
+  }
+  sel.value = selected && list.includes(selected) ? selected : list[0] || DEFAULT_MODEL;
+  session.model = sel.value;
+}
+
+/**
+ * 跟 API 要這把金鑰實際可用的模型。
+ * silent = 登入時的背景偵測，失敗就安靜略過，不要打擾使用者。
+ */
+async function detectModels({ silent = false } = {}) {
+  const apiKey = $("#api-key-input").value.trim() || session.apiKey;
+  if (!apiKey) {
+    if (!silent) showAlert($("#settings-msg"), "請先貼上 Gemini API key。");
+    return;
+  }
+
+  const btn = $("#model-detect");
+  btn.disabled = true;
+  if (!silent) showAlert($("#settings-msg"), "偵測中…", "ok");
+
+  try {
+    const models = await listModels(apiKey);
+    if (!models.length) {
+      if (!silent) showAlert($("#settings-msg"), "這把金鑰沒有可用的 Gemini 模型。");
+      return;
+    }
+
+    // 目前選的模型如果已經不在清單裡（例如退役了），自動換成最便宜的
+    const previous = session.model;
+    const stillValid = models.includes(previous);
+    fillModelOptions(models, stillValid ? previous : models[0]);
+
+    if (!stillValid) {
+      await saveSettings({ apiKey: session.apiKey || apiKey, model: session.model });
+      showAlert(
+        $("#settings-msg"),
+        `「${previous}」已經不能用了，自動換成「${session.model}」。`,
+        "ok"
+      );
+      toast(`模型已換成 ${session.model}`);
+    } else if (!silent) {
+      showAlert($("#settings-msg"), `找到 ${models.length} 個可用模型，清單已更新。`, "ok");
+    }
+  } catch (err) {
+    console.error(err);
+    if (!silent) showAlert($("#settings-msg"), err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function wireSettings() {
   const input = $("#api-key-input");
+
+  $("#model-detect").addEventListener("click", () => detectModels());
 
   $("#api-key-toggle").addEventListener("click", (e) => {
     const showing = input.type === "text";
@@ -317,6 +384,8 @@ function wireSettings() {
       session.model = model;
       showAlert($("#settings-msg"), "已儲存到你自己的 Firestore 文件。", "ok");
       toast("API key 已儲存");
+      // 換金鑰後可用的模型可能不同，順手重抓一次清單
+      await detectModels({ silent: true });
     } catch (err) {
       console.error(err);
       showAlert($("#settings-msg"), `儲存失敗：${err.message}`);

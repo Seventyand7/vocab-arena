@@ -203,11 +203,11 @@
         </div>
         <div class="field mt-md">
           <span class="field-label">模型</span>
-          <select id="model-select" class="input">
-            <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite（最便宜，預設）</option>
-            <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</option>
-            <option value="gemini-2.5-flash">gemini-2.5-flash（品質稍高）</option>
-          </select>
+          <div class="row-form">
+            <select id="model-select" class="input"></select>
+            <button id="model-detect" class="btn btn-ghost" type="button">偵測可用模型</button>
+          </div>
+          <p class="hint">模型會改版、退役，寫死的名稱早晚會失效。按「偵測可用模型」會直接問 API 你的金鑰現在能用哪些，清單由便宜到貴排序。</p>
         </div>
         <div id="settings-msg" class="alert" hidden></div>
         <div class="btn-row mt-md">
