@@ -14,12 +14,12 @@
    ============================================================ */
 
 export const firebaseConfig = {
-  apiKey: "REPLACE_ME",
-  authDomain: "REPLACE_ME.firebaseapp.com",
-  projectId: "REPLACE_ME",
-  storageBucket: "REPLACE_ME.firebasestorage.app",
-  messagingSenderId: "REPLACE_ME",
-  appId: "REPLACE_ME",
+  apiKey: "AIzaSyAOE7nDGMutVIHt_CxhbadKDvpWf7ERDzk",
+  authDomain: "vocab-arena-c5c41.firebaseapp.com",
+  projectId: "vocab-arena-c5c41",
+  storageBucket: "vocab-arena-c5c41.firebasestorage.app",
+  messagingSenderId: "213537942084",
+  appId: "1:213537942084:web:e0c53204ff708123eeea11"
 };
 
 /** config 還沒填的話，app 會改走 setup 畫面（暫存在 localStorage）。 */
