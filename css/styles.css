@@ -208,6 +208,8 @@ select.input{appearance:none;cursor:pointer}
 .alert{
   margin-top:14px;padding:11px 14px;border-radius:var(--r-sm);
   font-size:13.5px;line-height:1.7;border:1px solid;
+  white-space:pre-line;          /* 訊息裡的 \n 要真的換行（例如顯示 UID） */
+  overflow-wrap:anywhere;        /* 長 UID 在手機上要能換行不撐破版面 */
 }
 .alert-error{background:rgba(255,84,112,.12);border-color:rgba(255,84,112,.45);color:#FFB3C0}
 .alert-ok{background:rgba(61,220,151,.12);border-color:rgba(61,220,151,.45);color:#A9F2D4}

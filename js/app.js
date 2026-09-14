@@ -135,10 +135,15 @@ async function onAuthChange(user) {
     }
   } catch (err) {
     console.error(err);
-    // Security Rules 鎖定擁有者本人時，其他人登入會拿到 permission-denied
+    // 不在 Security Rules 白名單內的帳號登入時會拿到 permission-denied。
+    // 順便把 UID 顯示出來，對方才有東西可以拿來跟管理者申請開通。
     if (err?.code === "permission-denied") {
+      const { uid } = user;
       await signOutUser();
-      showAlert($("#login-error"), "這是個人使用的工具，只有擁有者本人的帳號能存取資料。");
+      showAlert(
+        $("#login-error"),
+        `你的帳號還沒有存取權限。如果需要使用，請把下面這組 UID 給管理者加入白名單：\n${uid}`
+      );
       return;
     }
     toast(`讀取資料失敗：${err.message}`, true);
