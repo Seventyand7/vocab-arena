@@ -80,6 +80,18 @@ git push -u origin main
 
 然後到 repository 的 **Settings → Pages**，Source 選 `Deploy from a branch`，branch 選 `main` / `(root)`，儲存後等一兩分鐘即可。
 
+## 本機開發
+
+⚠️ **不要直接雙擊 `index.html` 開啟。** 這個專案用 ES modules，瀏覽器基於 CORS 規範不允許從 `file://` 載入模組，畫面會卡在 LOADING。
+
+要在本機跑，在專案資料夾起一個簡單的 HTTP server：
+
+```bash
+python -m http.server 8000
+```
+
+然後開 `http://localhost:8000`。如果本機登入被擋，到 Firebase Console → Authentication → Settings → Authorized domains 補上 `localhost`。
+
 ## 資料結構
 
 ```
